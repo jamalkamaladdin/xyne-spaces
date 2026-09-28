@@ -243,6 +243,9 @@ const AppSidebar = (): ReactElement => {
   const [isSettingsPopoverOpen, setIsSettingsPopoverOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [inviteDialogInitialView, setInviteDialogInitialView] = useState<
+    'default' | 'contacts'
+  >('default');
   const [isErrorReportOpen, setIsErrorReportOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
@@ -250,6 +253,38 @@ const AppSidebar = (): ReactElement => {
   const [preferencesInitialSection, setPreferencesInitialSection] = useState<
     PreferenceSection | undefined
   >(undefined);
+
+  // Contacts-import OAuth return: the backend redirects back to the route the
+  // user started from with ?contactsImport=success (or contactsImportError=...).
+  // Strip the params and reopen the invite dialog straight into the picker.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const contactsImport = params.get('contactsImport');
+    const contactsImportError = params.get('contactsImportError');
+    if (!contactsImport && !contactsImportError) return;
+
+    params.delete('contactsImport');
+    params.delete('contactsImportError');
+    const remainingSearch = params.toString();
+    void navigate(
+      `${location.pathname}${remainingSearch ? `?${remainingSearch}` : ''}`,
+      { replace: true },
+    );
+
+    if (contactsImport === 'success') {
+      setInviteDialogInitialView('contacts');
+      setIsInviteDialogOpen(true);
+    } else {
+      toast.error('Failed to import contacts. Please try again.');
+    }
+  }, [location.pathname, location.search, navigate]);
+
+  const handleInviteDialogOpenChange = (nextOpen: boolean): void => {
+    setIsInviteDialogOpen(nextOpen);
+    if (!nextOpen) {
+      setInviteDialogInitialView('default');
+    }
+  };
 
   useEffect(() => {
     setOpenQuickMenu(null);
@@ -777,8 +812,9 @@ const AppSidebar = (): ReactElement => {
 
         <WorkspaceInviteDialog
           open={isInviteDialogOpen}
-          onOpenChange={setIsInviteDialogOpen}
+          onOpenChange={handleInviteDialogOpenChange}
           workspaceId={workspaceId}
+          initialView={inviteDialogInitialView}
         />
 
         {/* Status Update Modal */}
