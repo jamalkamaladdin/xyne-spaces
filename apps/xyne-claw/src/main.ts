@@ -23,6 +23,7 @@ import { markRunQueueDrainPaused, startRunQueueWorker } from "./run-queue-worker
 import { startLoopWatchdog, stopLoopWatchdog } from "./loop-watchdog.js";
 import { stopRunControlSubscriber } from "./run-control.js";
 import { createLogger } from "./logger.js";
+import { installSandboxRepoConfigLoader } from "./sandbox-repo-configs.js";
 const log = createLogger("main");
 
 const DRAIN_TIMEOUT_MS = Number(process.env["DRAIN_TIMEOUT"] ?? 900) * 1_000;
@@ -52,6 +53,7 @@ if (!DATA_DIR_IS_EXPLICIT && process.env["NODE_ENV"] === "production") {
 
 startLoopWatchdog();
 initStore();
+installSandboxRepoConfigLoader();
 startSessionCleanup();
 const runQueueWorker = startRunQueueWorker();
 
