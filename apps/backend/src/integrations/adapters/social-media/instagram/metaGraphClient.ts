@@ -248,8 +248,8 @@ export const metaGraphClient = {
       .createHmac('sha256', appSecret)
       .update(payloadB64)
       .digest('base64url');
-    const expectedBuf = Buffer.from(expected);
-    const sigBuf = Buffer.from(sigB64);
+    const expectedBuf = Buffer.from(expected, 'base64url');
+    const sigBuf = Buffer.from(sigB64, 'base64url');
     if (expectedBuf.length !== sigBuf.length) return null;
     if (!crypto.timingSafeEqual(expectedBuf, sigBuf)) return null;
     try {

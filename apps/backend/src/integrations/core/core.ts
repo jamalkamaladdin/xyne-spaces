@@ -380,7 +380,11 @@ export class ExternalSourceCore {
         externalId: normalizedData.externalId,
         externalThreadId: normalizedData.externalThreadId,
         entityId: resolvedEntityId,
-        direction: normalizedData.metadata.isReply ? MessageDirection.OUTGOING : MessageDirection.INCOMING,
+        // For Zoho, TICKET_THREAD_ADD sets isReply=true but represents a customer message (INCOMING).
+        // For all other adapters, isReply=true means an agent sent the message (OUTGOING).
+        direction: (normalizedData.metadata.isReply && source.sourceType !== ExternalSourcePlatform.ZOHO)
+          ? MessageDirection.OUTGOING
+          : MessageDirection.INCOMING,
         entityType: isDeskChannel ? ExternalEntityType.EMAIL : ExternalEntityType.MESSAGE,
         // Override createdAt with the real event time for Instagram only (24h window check).
         // Other adapters keep @default(now()) to avoid reordering historical imports.

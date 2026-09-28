@@ -114,11 +114,22 @@ export class InstagramFlow extends BaseFlow {
 
   getSourceNameFromDB(payload: unknown): string | undefined {
     const body = payload as Record<string, unknown>;
-    const entry = (body?.entry as Array<Record<string, unknown>>)?.[0];
+    const entries = body?.entry as Array<Record<string, unknown>> | undefined;
+    const entry = entries?.[0];
     // entry.id is always the business IG account ID (the webhook subscriber) for all
     // Instagram event types — message, message_edit, reactions, etc.
     const igUserId = entry?.id as string | undefined;
     if (!igUserId) return undefined;
+
+    // Warn if Meta batched entries for more than one account — only the first is
+    // processed here. If this warning fires in production, implement per-account dispatch.
+    const distinctIds = new Set(entries?.map(e => e.id).filter(Boolean) ?? []);
+    if (distinctIds.size > 1) {
+      logger.warn('[InstagramFlow] Webhook contains entries for multiple IG accounts — only first processed', {
+        accounts: [...distinctIds],
+      });
+    }
+
     return `instagram-${igUserId}`;
   }
 

@@ -15,7 +15,7 @@ import { adapterRegistry } from './adapterRegistry';
 export class AdapterFactory {
   static create(
     platform: ExternalSourcePlatform,
-    authenticator: BaseAuthenticator,
+    authenticator: BaseAuthenticator | undefined,
     transformer: BaseTransformer<any, any>,
     flow?: BaseFlow,
     postprocessor?: BasePostprocessor,
@@ -25,7 +25,9 @@ export class AdapterFactory {
   ): ExternalSourceAdapter {
     const adapter: ExternalSourceAdapter = {
       name: platform,
-      authenticate: authenticator.authenticate.bind(authenticator),
+      authenticate:
+        authenticator?.authenticate.bind(authenticator) ??
+        (async () => ({ authenticated: false })),
       preprocess: flow?.preprocess?.bind(flow),
       getSourceNameFromDB: flow?.getSourceNameFromDB?.bind(flow),
       isTestPayload: flow?.isTestPayload?.bind(flow),
@@ -51,22 +53,17 @@ export class AdapterFactory {
     postprocessor?: BasePostprocessor,
     interactionReplySender?: BaseInteractionReplySender,
   ): ExternalSourceAdapter {
-    const adapter: ExternalSourceAdapter = {
-      name: platform,
-      authenticate: async () => ({ authenticated: true }),
-      transform: transformer.transform.bind(transformer),
-      postprocess:
-        postprocessor?.process.bind(postprocessor) ||
-        transformer.postprocess?.bind(transformer),
-      preprocess: flow?.preprocess?.bind(flow),
-      getSourceNameFromDB: flow?.getSourceNameFromDB?.bind(flow),
-      isTestPayload: flow?.isTestPayload?.bind(flow),
-      isTestQueryParam: flow?.isTestQueryParam?.bind(flow),
-      sendInteractionReply: interactionReplySender?.sendReply.bind(interactionReplySender),
-    };
-
+    const adapter = AdapterFactory.create(
+      platform,
+      undefined,
+      transformer,
+      flow,
+      postprocessor,
+      undefined,
+      undefined,
+      interactionReplySender,
+    );
     adapter.supportsPolling = true;
-    adapterRegistry.register(platform, adapter);
     return adapter;
   }
 }

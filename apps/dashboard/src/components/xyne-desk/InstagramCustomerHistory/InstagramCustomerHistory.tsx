@@ -35,6 +35,7 @@ export function InstagramCustomerHistory({ channelId, conversationId, onTicketCl
 
   useEffect(() => {
     if (!channelId || !conversationId) return;
+    let cancelled = false;
     setLoading(true);
     void apiInstance
       .get<{ igsid: string | null; tickets: PreviousTicket[] }>(
@@ -42,14 +43,17 @@ export function InstagramCustomerHistory({ channelId, conversationId, onTicketCl
         { params: { conversationId } },
       )
       .then(res => {
-        setTickets(res.data.tickets);
+        if (!cancelled) setTickets(res.data.tickets);
       })
       .catch(() => {
-        setTickets([]);
+        if (!cancelled) setTickets([]);
       })
       .finally(() => {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [channelId, conversationId]);
 
   if (loading || tickets.length === 0) return null;
