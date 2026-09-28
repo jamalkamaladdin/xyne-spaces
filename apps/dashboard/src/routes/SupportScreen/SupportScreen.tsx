@@ -6025,6 +6025,12 @@ export const SupportTicketDetail = ({
                       aria-label='Copy link to ticket'
                       data-track-category='Support'
                       data-track-name='CopyTicketLink'
+                      data-track-metadata={JSON.stringify(
+                        deskTicketTrackingMetadata(ticket, {
+                          deskType: channelPreference?.deskType ?? null,
+                          emailCount,
+                        }),
+                      )}
                     >
                       <LinkIcon size={16} />
                     </button>
