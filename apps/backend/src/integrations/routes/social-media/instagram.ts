@@ -1,16 +1,10 @@
 import express, { type Request, type Response } from 'express';
 import { Prisma } from '@prisma/client';
-import {
-  ChannelRole,
-  ChannelScopeType,
-  ChannelType,
-  ChannelVisibility,
-  DeskType,
-  EmailMergeMode,
-} from '@xyne/shared';
+import { ChannelType } from '@xyne/shared';
 import { z } from 'zod';
 import { authV2Middleware } from '@/middleware/authV2Middleware';
 import { db } from '@/database/client';
+import { getInstagramOauthCallbackTx } from '@/bypassAcl/transactions/instagram';
 import { decrypt, encrypt } from '@/services/encryptionService';
 import { getBackendUrl, getFrontendUrl } from '@/utils/publicUrls';
 import { logger } from '@/utils/logger';
@@ -390,71 +384,7 @@ router.get(
         return;
       }
 
-      const now = new Date();
-      const result = await db.$transaction(async (tx) => {
-        const channel = await tx.channel.create({
-          data: {
-            name: state.channelName,
-            type: ChannelType.SOCIAL_MEDIA,
-            scopeType: ChannelScopeType.DEFAULT,
-            visibility: state.visibility === 'PUBLIC' ? ChannelVisibility.PUBLIC : ChannelVisibility.PRIVATE,
-            createdBy: state.userId,
-            projectId: state.projectId,
-            workspaceId: state.workspaceId,
-          },
-        });
-        await tx.channelParticipant.create({
-          data: {
-            workspaceId: state.workspaceId,
-            channelId: channel.id,
-            userId: state.userId,
-            role: ChannelRole.ADMIN,
-          },
-        });
-        await tx.channelUserStatus.create({
-          data: {
-            workspaceId: state.workspaceId,
-            channelId: channel.id,
-            userId: state.userId,
-            updatedAt: now,
-          },
-        });
-        await tx.channelStats.create({
-          data: {
-            workspaceId: state.workspaceId,
-            channelId: channel.id,
-            participantCount: 1,
-            lastActivityAt: now,
-          },
-        });
-        await tx.emailChannelPreference.create({
-          data: {
-            channelId: channel.id,
-            workspaceId: state.workspaceId,
-            ownerUserId: state.userId,
-            assigneeUserGroupId: state.assigneeUserGroupId,
-            boardId: state.boardId,
-            deskType: DeskType.SOCIAL_MEDIA,
-            emailMergeMode: EmailMergeMode.DISABLED,
-          },
-        });
-        const source = await tx.externalSource.create({
-          data: {
-            name: sourceName,
-            sourceType: ExternalSourcePlatform.INSTAGRAM,
-            displayName: igUsername || state.channelName,
-            channelId: channel.id,
-            externalIdentifier: igUserId,
-            workspaceId: state.workspaceId,
-            boardId: state.boardId,
-            ownerUserId: state.userId,
-            credentials: encryptedCredentials,
-            isActive: true,
-          },
-          select: { id: true },
-        });
-        return { channelId: channel.id, sourceId: source.id };
-      });
+      const result = await getInstagramOauthCallbackTx(state, sourceName, igUsername, igUserId, encryptedCredentials, new Date());
 
       redirectToDesk(req, res, {
         workspaceId: state.workspaceId,
