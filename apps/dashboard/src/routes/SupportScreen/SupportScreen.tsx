@@ -6031,7 +6031,9 @@ export const SupportTicketDetail = ({
                   </Tooltip>
                   <div className='w-px h-4 bg-border' />
 
-                  {channel && channel.type !== ChannelType.APP && <CloudAgentDock buttonBehavior='floating' />}
+                  {channel && channel.type !== ChannelType.APP && (
+                    <CloudAgentDock buttonBehavior='floating' />
+                  )}
 
                   <Tooltip
                     side='bottom'
