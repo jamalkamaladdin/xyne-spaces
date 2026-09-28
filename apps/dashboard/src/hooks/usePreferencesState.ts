@@ -14,7 +14,6 @@ import { useSummaryModelPreference } from './useSummaryModelPreference';
 import { useSearchMode } from './useSearchMode';
 import { useThreadBroadcastMentions } from './useThreadBroadcastMentions';
 import { useCallJoinSettings } from './useCallJoinSettings';
-import { useClawDashboardVisibility } from './useClawDashboardVisibility';
 import { useCallMediaQualitySettings } from './useCallMediaQualitySettings';
 import { useRecordingDefaultLayout } from './useRecordingDefaultLayout';
 import { useRecordingVersion } from './useRecordingVersion';
@@ -54,7 +53,6 @@ export function usePreferencesState(enabled: boolean) {
   const { showStreams, setShowStreams } = useStreamsVisibility();
   const { summaryModelPreference, setSummaryModelPreference } = useSummaryModelPreference();
   const { searchMode } = useSearchMode();
-  const { showClawDashboard, setShowClawDashboard } = useClawDashboardVisibility();
   const { allowThreadBroadcastMentions, setAllowThreadBroadcastMentions } =
     useThreadBroadcastMentions();
   const {
@@ -157,8 +155,6 @@ export function usePreferencesState(enabled: boolean) {
     setSummaryModelPreference,
     setEnterSendsMessage,
     searchMode,
-    showClawDashboard,
-    setShowClawDashboard,
     allowThreadBroadcastMentions,
     setAllowThreadBroadcastMentions,
     linksOpenExternalByDefault,

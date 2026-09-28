@@ -676,7 +676,7 @@ const ConversationHeader = ({
       </Tabs.Root>
 
       <Dialog
-        className='max-w-[620px] rounded-2xl overflow-hidden'
+        className='max-w-[760px] rounded-2xl overflow-hidden'
         open={isInfoOpen}
         onOpenChange={setIsInfoOpen}
       >
