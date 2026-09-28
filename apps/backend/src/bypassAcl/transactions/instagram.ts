@@ -10,6 +10,7 @@ import {
   DeskType,
   EmailMergeMode,
 } from '@xyne/shared';
+import { logger } from '@/utils/logger';
 
 export function getInstagramOauthCallbackTx(
   state: InstagramOAuthState,
@@ -20,8 +21,8 @@ export function getInstagramOauthCallbackTx(
   now: Date,
 ) {
   return transaction(
-    ['Channel', 'ChannelParticipant', 'ChannelUserStatus', 'ChannelStats', 'EmailChannelPreference', 'ExternalSource'],
-    'getInstagramOauthCallback: channel, participant, status, preference and external-source rows must commit atomically; tx is not ACL-wrapped',
+    ['Board', 'Channel', 'ChannelBoardMapping', 'ChannelParticipant', 'ChannelStats', 'ChannelUserStatus', 'EmailChannelPreference', 'ExternalSource'],
+    'getInstagramOauthCallback: channel, participant, status, preference, board-mapping and external-source rows must commit atomically; tx is not ACL-wrapped',
     db,
     async (tx) => {
       const channel = await tx.channel.create({
@@ -70,6 +71,38 @@ export function getInstagramOauthCallbackTx(
           emailMergeMode: EmailMergeMode.DISABLED,
         },
       });
+      // Dual-write: mirror the channel→project board set into ChannelBoardMapping
+      // so downstream consumers never need to read channel.projectId.
+      const mappingBoards = await tx.board.findMany({
+        where: { projectId: state.projectId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (mappingBoards.length > 0) {
+        const defaultBoardId =
+          state.boardId && mappingBoards.some((b) => b.id === state.boardId)
+            ? state.boardId
+            : mappingBoards[0].id;
+        if (state.boardId && state.boardId !== defaultBoardId) {
+          logger.warn(
+            `[CBM_DEFAULT] Requested boardId ${state.boardId} is not in project ${state.projectId} for channel ${channel.id}; ` +
+              `defaulting to oldest board ${defaultBoardId}.`,
+          );
+        }
+        await tx.channelBoardMapping.createMany({
+          data: mappingBoards.map((b) => ({
+            channelId: channel.id,
+            boardId: b.id,
+            workspaceId: state.workspaceId,
+            isDefault: b.id === defaultBoardId,
+            createdBy: state.userId,
+            createdAt: now,
+            updatedAt: now,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
       const source = await tx.externalSource.create({
         data: {
           name: sourceName,

@@ -3022,7 +3022,7 @@ const SupportScreen = (): ReactElement => {
             : c.type === ChannelType.CALL
               ? {
                   label: 'Call',
-                  className: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-200',
+                  className: 'bg-lime-100 text-lime-700 dark:bg-lime-500/20 dark:text-lime-200',
                 }
               : {
                   label: 'Mailbox',
@@ -6031,7 +6031,7 @@ export const SupportTicketDetail = ({
                   </Tooltip>
                   <div className='w-px h-4 bg-border' />
 
-                  {channel && <CloudAgentDock buttonBehavior='floating' />}
+                  {channel && channel.type !== ChannelType.APP && <CloudAgentDock buttonBehavior='floating' />}
 
                   <Tooltip
                     side='bottom'
@@ -6062,9 +6062,18 @@ export const SupportTicketDetail = ({
                             type='button'
                             onClick={() => {
                               if (!ticket?.id) return;
-                              void zero.mutate(
-                                mutators.emailRead.bulkMarkAsUnread({ ticketIds: [ticket.id] }),
-                              );
+                              void zero
+                                .mutate(
+                                  mutators.emailRead.bulkMarkAsUnread({ ticketIds: [ticket.id] }),
+                                )
+                                .client.then(() => {
+                                  trackDeskOutcome(
+                                    'READ_STATE_CHANGED',
+                                    ticket,
+                                    { deskType: channelPreference?.deskType ?? null, emailCount },
+                                    { to: 'unread', trigger: 'manual', bulkCount: 1 },
+                                  );
+                                });
                               goBackToTicketList();
                             }}
                             className='p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors'
@@ -6532,18 +6541,6 @@ export const SupportTicketDetail = ({
                         }
                       }}
                     />
-                    {channel?.type === ChannelType.SOCIAL_MEDIA &&
-                      channelIntegrationInfo.sourceType === 'instagram' &&
-                      channelId &&
-                      conversationId && (
-                        <InstagramCustomerHistory
-                          channelId={channelId}
-                          conversationId={conversationId}
-                          onTicketClick={xyneId => {
-                            void navigate(`${supportBase}/${channelId}/${xyneId}`);
-                          }}
-                        />
-                      )}
                   </>
                 ) : (
                   <div className='h-full flex items-center justify-center'>
