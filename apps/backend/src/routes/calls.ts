@@ -42,6 +42,7 @@ router.patch('/recordings/:callId', callController.updateRecordingTitle);
 router.delete('/recordings/:callId', callController.deleteRecording);
 router.get('/summary-templates', summaryTemplateController.list);
 router.post('/summary-templates', summaryTemplateController.create);
+router.post('/summary-templates/bulk', summaryTemplateController.bulkCreate);
 router.post('/summary-templates/ai/draft-context', summaryTemplateController.draftContext);
 router.post('/summary-templates/ai/suggest-sections', summaryTemplateController.suggestSections);
 router.post('/summary-templates/ai/test-selection', summaryTemplateController.testSelection);
@@ -80,6 +81,9 @@ router.post('/:callId/process-transcript', callController.processTranscript);
 
 // Download transcript endpoint (downloads transcript file from GCS)
 router.get('/:callId/download-transcript', callController.downloadTranscript);
+
+// Translate transcript endpoint (downloads transcript file from GCS)
+router.post('/:callId/translate-transcript', callController.translateTranscript);
 
 // Download recording endpoint (streams the call's latest recording — legacy/headless player)
 router.get('/:callId/download-recording', callController.downloadRecording);
