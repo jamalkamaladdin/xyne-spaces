@@ -249,6 +249,11 @@ export const WorkspaceSwitcher: React.FC = () => {
       }
       localStorage.setItem('user_id', res.data.user.id);
       setIsOpen(false);
+      // Prompt the creator to invite people into their fresh community
+      // workspace. The AppSidebar consumes this one-shot flag after the reload.
+      if (createWorkspaceType === WorkspaceType.COMMUNITY) {
+        sessionStorage.setItem('xyne-open-invite-dialog', 'true');
+      }
       window.location.href = `/${newWorkspaceId}/chat/dir`;
     } catch (err) {
       if (axios.isAxiosError(err)) {

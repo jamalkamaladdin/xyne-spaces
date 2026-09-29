@@ -286,6 +286,15 @@ const AppSidebar = (): ReactElement => {
     }
   };
 
+  // Fresh community workspace: the switcher sets a one-shot sessionStorage flag
+  // before its full-page navigation, so it survives the reload. Consume it here
+  // and prompt the creator to invite people into the new workspace.
+  useEffect(() => {
+    if (sessionStorage.getItem('xyne-open-invite-dialog') !== 'true') return;
+    sessionStorage.removeItem('xyne-open-invite-dialog');
+    setIsInviteDialogOpen(true);
+  }, []);
+
   useEffect(() => {
     setOpenQuickMenu(null);
   }, [activeRoute]);
