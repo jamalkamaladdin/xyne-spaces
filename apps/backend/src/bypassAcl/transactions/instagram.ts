@@ -34,6 +34,8 @@ export function getInstagramOauthCallbackTx(
           createdBy: state.userId,
           projectId: state.projectId,
           workspaceId: state.workspaceId,
+          participantCount: 1,
+          lastActivityAt: now,
         },
       });
       await tx.channelParticipant.create({
