@@ -6400,7 +6400,20 @@ export const SupportTicketDetail = ({
               ref={composerOverlayRef}
             >
               <DuplicateTicketsBanner ticketId={mailboxTicketId} />
-              {channel?.type === ChannelType.SOCIAL_MEDIA ? (
+              {isAppSourcedTicket ? (
+                conversationId ? (
+                  <SlackComposer
+                    conversationId={conversationId}
+                    channelId={channel?.id ?? null}
+                    drafts={ticketEmailDrafts}
+                    variant='app'
+                    // The ticket is app-sourced whatever the desk type, so the
+                    // channel preference alone decides whether the reply reaches
+                    // the app — matching appDeskService's outbound gate.
+                    recordOnly={channelPreference?.appWebhookDeliveryEnabled === false}
+                  />
+                ) : null
+              ) : channel?.type === ChannelType.SOCIAL_MEDIA ? (
                 conversationId ? (
                   <SocialMediaReplyComposer
                     conversationId={conversationId}
@@ -6419,16 +6432,6 @@ export const SupportTicketDetail = ({
                         ? { maxLength: 350 }
                         : {})}
                     trackingCategory='social-media-composer'
-                  />
-                ) : null
-              ) : isAppSourcedTicket ? (
-                conversationId ? (
-                  <SlackComposer
-                    conversationId={conversationId}
-                    channelId={channel?.id ?? null}
-                    drafts={ticketEmailDrafts}
-                    variant='app'
-                    recordOnly={channelPreference?.appWebhookDeliveryEnabled === false}
                   />
                 ) : null
               ) : channel?.type === ChannelType.SLACK || channel?.type === ChannelType.APP ? (
