@@ -79,9 +79,15 @@ export class InvitationController {
         return;
       }
 
-      // Only workspace admins/owners can send invitations
+      // Only workspace admins/owners can send invitations — except COMMUNITY_MEMBER
+      // invites: any member of an open community workspace may send those (the
+      // service still rejects them for non-community workspaces).
       const inviterRole = req.user?.role;
-      if (inviterRole !== 'ADMIN' && inviterRole !== 'OWNER') {
+      if (
+        inviterRole !== 'ADMIN' &&
+        inviterRole !== 'OWNER' &&
+        role !== WorkspaceRole.COMMUNITY_MEMBER
+      ) {
         res.status(403).json({ error: 'Only workspace admins can send invitations' });
         return;
       }
