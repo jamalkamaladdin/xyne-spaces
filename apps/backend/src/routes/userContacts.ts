@@ -218,6 +218,7 @@ router.get('/provider', authMiddleware.authenticate, async (req: Request, res: R
 
     const user = await repositories.users.findById(authenticatedUserId);
     const provider = user ? providerFromAuthProvider(user.authProvider as AuthProvider) : null;
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, provider });
   } catch (error) {
     logger.error('[USER_CONTACTS] Failed to resolve provider', error);
@@ -253,7 +254,9 @@ router.get('/', authMiddleware.authenticate, async (req: Request, res: Response)
     }
 
     const contacts = await listUserContacts(user.id, provider);
-    res.setHeader('Cache-Control', 'private, max-age=300, stale-while-revalidate=3600');
+    // The response is user-specific at a fixed URL — caching it lets a browser
+    // serve the previous user's contacts (and skip OAuth) after logout/login.
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, provider, connected: true, contacts });
   } catch (error) {
     logger.error('[USER_CONTACTS] Failed to list contacts', error);

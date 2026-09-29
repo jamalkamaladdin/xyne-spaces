@@ -26,15 +26,27 @@ type UserContactsOAuthInitResponse = {
   authUrl: string;
 };
 
+/** Cache-buster for the user-scoped GETs: their responses must never be reused
+    across sessions (logout/login), and a fixed URL alone would let the browser
+    serve the previous user's cached answer. */
+function noCacheParams(): Record<string, string> {
+  return { _t: Date.now().toString() };
+}
+
 /** Which provider the signed-in user can import contacts from (null = email/password sign-in). */
 export async function getUserContactsProvider(): Promise<UserContactsProvider | null> {
-  const response = await apiInstance.get<UserContactsProviderResponse>('/user-contacts/provider');
+  const response = await apiInstance.get<UserContactsProviderResponse>(
+    '/user-contacts/provider',
+    { params: noCacheParams() },
+  );
   return response.data.provider;
 }
 
 /** The signed-in user's provider contacts. `connected` is false until the contacts OAuth grant exists. */
 export async function getUserContacts(): Promise<UserContactsResponse> {
-  const response = await apiInstance.get<UserContactsResponse>('/user-contacts');
+  const response = await apiInstance.get<UserContactsResponse>('/user-contacts', {
+    params: noCacheParams(),
+  });
   return response.data;
 }
 
