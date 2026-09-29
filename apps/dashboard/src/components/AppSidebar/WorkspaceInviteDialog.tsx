@@ -654,7 +654,7 @@ export const WorkspaceInviteDialog = ({
 
                 <div className='space-y-3'>
                   <p className='text-[15px] font-medium leading-none text-muted-foreground'>
-                    Import contacts
+                    Invite Contacts
                   </p>
                   <button
                     type='button'
