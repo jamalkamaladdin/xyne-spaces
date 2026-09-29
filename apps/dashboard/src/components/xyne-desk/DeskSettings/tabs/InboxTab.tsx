@@ -16,6 +16,7 @@ import { SocialMediaDeskIntegrationCard } from '../../DeskIntegrationCard/Social
 import { AppStoreDeskIntegrationCard } from '../../DeskIntegrationCard/AppStoreDeskIntegrationCard';
 import { InstagramDeskIntegrationCard } from '../../DeskIntegrationCard/InstagramDeskIntegrationCard';
 import { ConnectedAppsSection } from '../ConnectedAppsSection';
+import { ConnectedSlackSection } from '../ConnectedSlackSection';
 import { InlineSignatureEditor } from '../InlineSignatureEditor';
 import { Switch } from '../../../ui/Switch';
 import { SearchableMultiSelect } from '../../../ui/SearchableMultiSelect/SearchableMultiSelect';
@@ -178,6 +179,10 @@ export const InboxTab: React.FC<InboxTabProps> = ({ channelId, form, signatures 
         managed by a single-connection card.
       */}
       {isDeskChannel && <ConnectedAppsSection channelId={channelId} canManage={canManage} />}
+      {/* Not on a SLACK desk — the card above already owns its single binding. */}
+      {isDeskChannel && !isSlack && (
+        <ConnectedSlackSection channelId={channelId} canManage={canManage} />
+      )}
 
       <div className='flex flex-col gap-[16px]'>
         <div className='flex flex-col gap-[4px]'>
