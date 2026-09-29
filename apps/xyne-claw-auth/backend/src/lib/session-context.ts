@@ -13,6 +13,7 @@ import { getRecoveryContextForSession } from "../queue/run-recovery-worker.js";
 import type { ExternalResultCallbackConfig } from "../surfaces/external-api/delivery.js";
 import type { SlackDeliveryTarget } from "../surfaces/slack/delivery.js";
 import type { ChannelDeliveryTarget, MessagingChannelKey } from "../surfaces/messaging/plugin.js";
+import type { RootAttachmentRef } from "./workflow-handoff.js";
 
 
 export interface SessionContext {
@@ -55,6 +56,7 @@ export interface SessionContext {
    * whether the user's request is satisfied.
    */
   rootTask?: string;
+  rootAttachments?: RootAttachmentRef[];
   agentId?: string;
   agentOrgId?: string | null;
   agentSlug?: string | undefined;

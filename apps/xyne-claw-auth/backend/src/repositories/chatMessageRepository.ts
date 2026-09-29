@@ -72,6 +72,39 @@ export const chatMessageRepository = {
     return true;
   },
 
+  /** Append a FlowUI artifact card, deduped by screenId. */
+  appendUiFlow: async (id: string, flow: { screenId: string }): Promise<void> => {
+    await prisma.$transaction(async (tx) => {
+      const row = await tx.chatMessage.findUnique({ where: { id }, select: { uiFlows: true } });
+      if (!row) return;
+      const existing = Array.isArray(row.uiFlows)
+        ? (row.uiFlows as Array<Record<string, unknown>>)
+        : [];
+      if (existing.some((entry) => entry?.["screenId"] === flow.screenId)) return;
+      await tx.chatMessage.update({
+        where: { id },
+        data: { uiFlows: [...existing, flow] as unknown as Prisma.InputJsonValue },
+      });
+    });
+  },
+
+  /** Swap a stored card for a new version of itself (pending → answered /
+   *  declined). Returns false when the message or screenId is gone. */
+  replaceUiFlow: async (id: string, screenId: string, flow: unknown): Promise<boolean> => {
+    return prisma.$transaction(async (tx) => {
+      const row = await tx.chatMessage.findUnique({ where: { id }, select: { uiFlows: true } });
+      if (!row || !Array.isArray(row.uiFlows)) return false;
+      const existing = row.uiFlows as Array<Record<string, unknown>>;
+      if (!existing.some((entry) => entry?.["screenId"] === screenId)) return false;
+      const next = existing.map((entry) => (entry?.["screenId"] === screenId ? flow : entry));
+      await tx.chatMessage.update({
+        where: { id },
+        data: { uiFlows: next as unknown as Prisma.InputJsonValue },
+      });
+      return true;
+    });
+  },
+
   /** Persist mid-run PARTIAL content, but ONLY while the row is still "running".
    *  Conditional (updateMany + status guard) so a late/cross-pod debounced write
    *  can never clobber the final content the completion callback wrote (which
@@ -171,9 +204,15 @@ export const chatMessageRepository = {
    *  even if they guess a conversationId. Returns the delete count. Alias
    *  array = both verified representations of the SAME caller. */
   deleteConversation: async (userIds: string | string[], agentSlug: string, conversationId: string) => {
+    const ids = Array.isArray(userIds) ? userIds : [userIds];
     const result = await prisma.chatMessage.deleteMany({
-      where: { ...userIdFilter(userIds), agentSlug, conversationId },
+      where: { userId: { in: ids }, agentSlug, conversationId },
     });
+    if (result.count > 0) {
+      await prisma.chatConversationMeta.deleteMany({
+        where: { conversationId, userId: { in: ids }, agentSlug },
+      });
+    }
     return result.count;
   },
 };
