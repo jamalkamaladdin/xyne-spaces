@@ -2,7 +2,7 @@ import { FormEvent, MouseEvent, ReactElement, useCallback, useEffect, useMemo, u
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
 import { CheckTickSingle, CopyDefault } from '@xyne/icons';
-import { WorkspaceRole } from '@xyne/shared';
+import { WorkspaceRole, WorkspaceType } from '@xyne/shared';
 import { toast } from 'sonner';
 import Dialog from '../ui/Dialog';
 import { Checkbox } from '../ui/Checkbox/Checkbox';
@@ -22,13 +22,15 @@ import { cn } from '../../utils/classNames';
 /** Dialog view: 'contacts' is used when returning from the contacts OAuth. */
 export type WorkspaceInviteDialogView = 'default' | 'contacts';
 
-type ContactsStep = 'default' | 'oauth-confirm' | 'contacts';
+type ContactsStep = 'default' | 'contacts';
 
 interface WorkspaceInviteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workspaceId: string | undefined;
   initialView?: WorkspaceInviteDialogView;
+  /** Drives the invite role: COMMUNITY workspaces invite COMMUNITY_MEMBERs, others MEMBERs. */
+  workspaceType?: WorkspaceType;
 }
 
 const EMAIL_SPLIT_PATTERN = /[\s,;]+/;
@@ -72,6 +74,7 @@ export const WorkspaceInviteDialog = ({
   onOpenChange,
   workspaceId,
   initialView = 'default',
+  workspaceType,
 }: WorkspaceInviteDialogProps): ReactElement => {
   const location = useLocation();
   const [emailsInput, setEmailsInput] = useState('');
@@ -86,10 +89,13 @@ export const WorkspaceInviteDialog = ({
   const [contactsSearch, setContactsSearch] = useState('');
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [isSendingInvites, setIsSendingInvites] = useState(false);
-  const [isStartingOAuth, setIsStartingOAuth] = useState(false);
   const [contactsError, setContactsError] = useState<string | null>(null);
 
   const providerLabel = contactsProvider === 'MICROSOFT' ? 'Microsoft' : 'Google';
+  const inviteRole =
+    workspaceType === WorkspaceType.COMMUNITY
+      ? WorkspaceRole.COMMUNITY_MEMBER
+      : WorkspaceRole.MEMBER;
 
   const inviteUrl = useMemo(
     () => (workspaceId ? getWorkspaceInviteUrl(workspaceId) : ''),
@@ -104,7 +110,7 @@ export const WorkspaceInviteDialog = ({
       setContactsProvider(result.provider);
       if (!result.connected) {
         setContacts([]);
-        setContactsStep('oauth-confirm');
+        setContactsError('Contacts are not connected yet. Please reconnect and try again.');
         return;
       }
       setContacts(result.contacts);
@@ -174,7 +180,7 @@ export const WorkspaceInviteDialog = ({
           try {
             await apiInstance.post('/invitations', {
               email,
-              role: WorkspaceRole.COMMUNITY_MEMBER,
+              role: inviteRole,
               workspaceId,
             });
             return { email };
@@ -184,7 +190,7 @@ export const WorkspaceInviteDialog = ({
         }),
       );
     },
-    [workspaceId],
+    [workspaceId, inviteRole],
   );
 
   const handleCopyLink = async (): Promise<void> => {
@@ -265,25 +271,6 @@ export const WorkspaceInviteDialog = ({
     }
   };
 
-  const handleOpenContactsImport = async (): Promise<void> => {
-    setIsLoadingContacts(true);
-    try {
-      const result = await getUserContacts();
-      setContactsProvider(result.provider);
-      if (!result.connected) {
-        setContacts([]);
-        setContactsStep('oauth-confirm');
-        return;
-      }
-      setContacts(result.contacts);
-      setContactsStep('contacts');
-    } catch {
-      toast.error('Failed to load contacts');
-    } finally {
-      setIsLoadingContacts(false);
-    }
-  };
-
   /** Current route minus the contacts OAuth return params, so the post-OAuth
       redirect lands back here without re-triggering the return handler. */
   const buildReturnPath = useCallback((): string => {
@@ -294,8 +281,10 @@ export const WorkspaceInviteDialog = ({
     return `${location.pathname}${search ? `?${search}` : ''}`;
   }, [location.pathname, location.search]);
 
-  const handleStartContactsOAuth = async (): Promise<void> => {
-    setIsStartingOAuth(true);
+  /** Returns true when the browser is navigating away to the consent page —
+      the loading state must be held through that, resetting it mid-navigation
+      makes the button flicker back to its idle label. */
+  const handleStartContactsOAuth = async (): Promise<boolean> => {
     try {
       const isElectron = typeof window.electronAPI?.openExternal === 'function';
       const { authUrl } = await initUserContactsOAuth(
@@ -304,13 +293,37 @@ export const WorkspaceInviteDialog = ({
       );
       if (isElectron && window.electronAPI?.openExternal) {
         window.electronAPI.openExternal(authUrl);
-        setIsStartingOAuth(false);
-      } else {
-        window.location.href = authUrl;
+        return false;
       }
+      window.location.href = authUrl;
+      return true;
     } catch {
       toast.error('Unable to start contacts authorization');
-      setIsStartingOAuth(false);
+      return false;
+    }
+  };
+
+  const handleOpenContactsImport = async (): Promise<void> => {
+    setIsLoadingContacts(true);
+    let redirectToOAuth = false;
+    try {
+      const result = await getUserContacts();
+      setContactsProvider(result.provider);
+      if (!result.connected) {
+        setContacts([]);
+        redirectToOAuth = true;
+      } else {
+        setContacts(result.contacts);
+        setContactsStep('contacts');
+      }
+    } catch {
+      toast.error('Failed to load contacts');
+    } finally {
+      if (!redirectToOAuth) setIsLoadingContacts(false);
+    }
+    if (redirectToOAuth) {
+      const navigatedAway = await handleStartContactsOAuth();
+      if (!navigatedAway) setIsLoadingContacts(false);
     }
   };
 
@@ -421,43 +434,6 @@ export const WorkspaceInviteDialog = ({
   };
 
   const renderContactsStep = (): ReactElement => {
-    if (contactsStep === 'oauth-confirm') {
-      return (
-        <div className='space-y-5'>
-          <div className='space-y-2'>
-            <h3 className='text-[17px] font-semibold text-foreground'>Import contacts</h3>
-            <p className='text-[14px] leading-relaxed text-muted-foreground'>
-              To read your {providerLabel} contacts, you&apos;ll be asked to sign in with{' '}
-              {providerLabel} again and grant permission to read your contacts. Nothing else is
-              requested.
-            </p>
-          </div>
-          <div className='flex justify-between gap-3'>
-            <button
-              type='button'
-              onClick={() => setContactsStep('default')}
-              className='h-10 rounded-[12px] border border-border px-4 text-[14px] font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70'
-              data-track-category='WorkspaceInviteDialog'
-              data-track-name='ContactsOAuthCancel'
-            >
-              Back
-            </button>
-            <button
-              type='button'
-              onClick={() => void handleStartContactsOAuth()}
-              disabled={isStartingOAuth}
-              className='flex h-10 items-center gap-2 rounded-[12px] bg-[#ff6368] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#f2555b] disabled:cursor-not-allowed disabled:opacity-70'
-              data-track-category='WorkspaceInviteDialog'
-              data-track-name='ContactsOAuthContinue'
-            >
-              {contactsProvider === 'MICROSOFT' ? <MicrosoftLogo className='h-4 w-4' /> : <GoogleLogo className='h-4 w-4' />}
-              {isStartingOAuth ? 'Redirecting...' : `Continue with ${providerLabel}`}
-            </button>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div className='flex max-h-[65vh] flex-col gap-4'>
         <div className='flex items-center justify-between gap-3'>
@@ -501,7 +477,7 @@ export const WorkspaceInviteDialog = ({
               </button>
               <button
                 type='button'
-                onClick={() => setContactsStep('oauth-confirm')}
+                onClick={() => void handleStartContactsOAuth()}
                 className='h-9 rounded-[10px] bg-[#ff6368] px-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#f2555b]'
                 data-track-category='WorkspaceInviteDialog'
                 data-track-name='ContactsReconnect'

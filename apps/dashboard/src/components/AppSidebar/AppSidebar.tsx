@@ -193,6 +193,10 @@ const AppSidebar = (): ReactElement => {
     enabled: !!workspaceId,
   });
   const isCommunityWorkspace = workspace?.workspaceType === WorkspaceType.COMMUNITY;
+  // Anyone can invite into an open community workspace; enterprise workspaces
+  // follow the backend gate — only workspace ADMIN/OWNER may send MEMBER invites.
+  const canInvitePeople =
+    isCommunityWorkspace || user?.role === 'ADMIN' || user?.role === 'OWNER';
 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
@@ -672,7 +676,7 @@ const AppSidebar = (): ReactElement => {
         >
           <ZeroConnectionStatus className='mb-2' />
 
-          {isCommunityWorkspace && (
+          {canInvitePeople && (
             <Tooltip content='Invite people' side='right' delayDuration={0}>
               <button
                 type='button'
@@ -824,6 +828,7 @@ const AppSidebar = (): ReactElement => {
           onOpenChange={handleInviteDialogOpenChange}
           workspaceId={workspaceId}
           initialView={inviteDialogInitialView}
+          workspaceType={workspace?.workspaceType}
         />
 
         {/* Status Update Modal */}
