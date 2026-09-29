@@ -47,6 +47,10 @@ export class InvitationsACL extends BaseQueryACL<
 
   async canCreate(data: Prisma.InvitationUncheckedCreateInput): Promise<boolean> {
     if (data.workspaceId !== this.ctx.workspaceId) return false
-    return this.ctx.role === 'ADMIN' || this.ctx.role === 'OWNER'
+    if (this.ctx.role === 'ADMIN' || this.ctx.role === 'OWNER') return true
+    // Any workspace member may send COMMUNITY_MEMBER invites — anyone can join an
+    // open community workspace directly; the invitation service rejects this role
+    // for non-community workspaces.
+    return data.role === 'COMMUNITY_MEMBER'
   }
 }
