@@ -37,7 +37,8 @@ import {
 } from "xyne-claw-shared";
 import { tools as xyneSpacesTools } from "../mcp/servers/xyne-spaces-tools.js";
 import { mintSessionToken } from "./session-tokens.js";
-import { resolveClawUserIdForSpacesIdentity } from "./users-jit.js";
+import { getSessionByConv } from "./session-context.js";
+import { resolveClawUserIdForSpacesIdentity, spacesUserIdForClawUser } from "./users-jit.js";
 import {
   resolveAgentProviderConfigs,
   resolveSubagentProviderMode,
@@ -934,14 +935,6 @@ export async function prepareRun(
         ? `${resolvedAttachedContext.promptPrefix}\n\n${mergedContext}`
         : resolvedAttachedContext.promptPrefix;
     }
-    if (effectiveChannelId) {
-      try {
-        const hubKnowledge = await loadSdlcHubKnowledge(effectiveChannelId, resolved.userId);
-        if (hubKnowledge) mergedContext = mergedContext ? `${hubKnowledge}\n\n${mergedContext}` : hubKnowledge;
-      } catch (err) {
-        log.warn("[run] failed to load SDLC Hub Knowledge:", errMsg(err));
-      }
-    }
 
     // Inject live agent catalog for the Claw concierge agent so the LLM
     // always sees the current agents without any hardcoded list in the prompt.
@@ -1005,10 +998,41 @@ export async function prepareRun(
     }
     let sdlcAgentRunContext = parseSdlcAgentRunContext(mergedAgentConfig["sdlcContext"]);
     if (!sdlcAgentRunContext) {
+      // Claw chat sends no channel; a hub thread reopened there takes its hub from the thread's last run.
+      const hubChannelId =
+        effectiveChannelId ||
+        (conversationId && agentSlug
+          ? ((await getSessionByConv(conversationId, agentSlug).catch(() => null))?.channelId ?? "")
+          : "");
+      // Automation/queued dispatch bodies may carry the hub's workspace;
+      // without it a two-workspace user's identity resolution is ambiguous.
+      const bodyWorkspaceId = (body as { workspaceId?: unknown }).workspaceId;
+      const hubWorkspaceHint =
+        typeof bodyWorkspaceId === "string" && bodyWorkspaceId.trim() ? bodyWorkspaceId.trim() : undefined;
       sdlcAgentRunContext = parseSdlcAgentRunContext(
-        await resolveSdlcHubContextForUser(resolved.userId, effectiveChannelId, conversationId),
+        await resolveSdlcHubContextForUser(resolved.userId, hubChannelId, conversationId, hubWorkspaceHint),
       );
       if (sdlcAgentRunContext) mergedAgentConfig = { ...mergedAgentConfig, sdlcContext: sdlcAgentRunContext };
+    }
+    // NOTE: this branch pre-dates the mainline `mergeSdlcToolProfile` module
+    // (sdlc-run-tools.ts); SDLC tool wiring here stays on sdlcAgentToolProfile.
+    if (effectiveChannelId) {
+      try {
+        // Hub Knowledge membership (channelParticipant.userId) is keyed by the
+        // workspace-scoped Spaces id, while resolved.userId is the canonical
+        // Claw id — convert before the lookup or the filter matches nothing
+        // and hub knowledge silently drops out of the run context. The hub
+        // context carries the run's workspace, which disambiguates users
+        // holding memberships in two Spaces workspaces.
+        const hubWorkspaceRaw = sdlcAgentRunContext?.["workspaceId"];
+        const hubWorkspaceId =
+          typeof hubWorkspaceRaw === "string" && hubWorkspaceRaw.trim() ? hubWorkspaceRaw.trim() : undefined;
+        const hubKnowledgeUserId = await spacesUserIdForClawUser(resolved.userId, hubWorkspaceId);
+        const hubKnowledge = await loadSdlcHubKnowledge(effectiveChannelId, hubKnowledgeUserId);
+        if (hubKnowledge) mergedContext = mergedContext ? `${hubKnowledge}\n\n${mergedContext}` : hubKnowledge;
+      } catch (err) {
+        log.warn("[run] failed to load SDLC Hub Knowledge:", errMsg(err));
+      }
     }
     const effectiveFastMode =
       explicitFastMode ??
@@ -1292,7 +1316,8 @@ export async function prepareRun(
         const sessionContext: SessionContext = {
           mentionedUserId: agent.spacesAppUserId ?? "",
           senderId: resolved.userId,
-          senderName: resolved.userName || resolved.userId,
+          // Never render the canonical id as a display name.
+          senderName: resolved.userName || resolved.userEmail || resolved.userId,
           channelId: effectiveChannelId ?? "",
           channelName: effectiveChannelId ?? "",
           conversationId: conversationId ?? "",

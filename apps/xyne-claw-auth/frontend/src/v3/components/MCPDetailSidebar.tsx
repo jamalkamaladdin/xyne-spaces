@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { isCurrentUser } from "../../lib/identity";
 import {
   PencilSimpleIcon,
   ArrowsClockwiseIcon,
@@ -227,7 +228,7 @@ export function MCPDetailSidebar({
   const scope = rawScope ?? (isPlatformConnector ? "built-in" : "unknown");
   const publishStatus = rawPublishStatus ?? "unknown";
   const ownerUserId = server.connectorMeta?.ownerUserId as string | undefined;
-  const isOwner = ownerUserId === userId;
+  const isOwner = isCurrentUser(ownerUserId);
   const publishReviewNote = server.connectorMeta?.publishReviewNote as
     | string
     | undefined;
