@@ -11,7 +11,7 @@ import { withWorkspaceScope } from '@/database/tenant/context';
 import { createOwnerInvitation, syncAllBotUsersForNewWorkspace } from '@/bypassAcl/orgServices';
 import { logger } from '@/utils/logger';
 import { config } from '@/config/env';
-import { ProjectType } from '@xyne/shared';
+import { ProjectType, WorkspaceRole } from '@xyne/shared';
 import { aiProvisioningService } from '@/services/aiProvisioningService';
 import { isOrganizationPolicyError, organizationDomainService } from '@/services/organizationDomainService';
 import { CacConfigService } from '@/services/cacConfigService';
@@ -126,7 +126,11 @@ export class InvitationController {
       });
 
       let tempPassword: string | null = null;
-      if (existingWorkspaceUsers === 0 && role !== 'GUEST') {
+      if (
+        existingWorkspaceUsers === 0 &&
+        role !== 'GUEST' &&
+        role !== WorkspaceRole.COMMUNITY_MEMBER
+      ) {
         tempPassword = await invitationService.generateOrgMemberPassword(normalizedEmail);
       }
 

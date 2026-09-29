@@ -95,6 +95,15 @@ export class InvitationService {
       // orgId supplied directly — skip inviter-org derivation and invitee-in-org check
       // (caller is responsible for having already added the invitee as an org member)
       orgId = explicitOrgId;
+    } else if (role === WorkspaceRole.COMMUNITY_MEMBER) {
+      const communityWorkspace = await this.prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { orgId: true },
+      });
+      if (!communityWorkspace?.orgId) {
+        throw new Error('Community workspace not found');
+      }
+      orgId = communityWorkspace.orgId;
     } else {
       // Derive orgId from the inviting user's active org membership
       const inviter = await this.prisma.user.findUnique({
@@ -112,8 +121,9 @@ export class InvitationService {
       }
       orgId = derivedOrgId;
 
-      // Ensure the invitee exists in the org_members table (any org)
-      if (role !== WorkspaceRole.GUEST && role !== WorkspaceRole.COMMUNITY_MEMBER) {
+      // Ensure the invitee exists in the org_members table (any org).
+      // GUEST and COMMUNITY_MEMBER are handled in the branches above.
+      if (role !== WorkspaceRole.GUEST) {
         // Looks the invitee up across any org, not just the caller's, so it runs above the caller's own scope.
         // The query MUST be awaited inside the closure: Prisma promises are lazy, so awaiting
         // outside would execute the query after withWorkspaceScope has exited — back in the
