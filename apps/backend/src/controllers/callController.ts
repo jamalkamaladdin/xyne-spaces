@@ -27,6 +27,7 @@ import { normalizeStoragePath } from '@xyne/storage';
 import { sdlcCallLinkSchema, type SdlcCallLink } from '@xyne/shared';
 import { callRecordingService } from '@/services/callRecordingService';
 import { isRecording, isRecordingType } from '@/utils/callTypeUtils';
+import { isTranscriptUnlinked } from '@/utils/transcriptUnlink';
 import { config } from '@/config/env';
 import { callDocumentService, numberTranscriptSegments, buildParticipantMap } from '@/services/callDocumentService';
 import {
@@ -1396,12 +1397,17 @@ export class CallController {
       let identifiedTranscriptContent: string | null = null;
       let hasTranscript: boolean;
       let hasIdentifiedTranscript: boolean;
+      // Admin unlink keeps the storage files, and every read below goes to storage by
+      // call id, so an unlinked transcript has to be treated as absent here.
+      const transcriptUnlinked = isTranscriptUnlinked(call);
 
       if (scope === 'metadata') {
-        [hasTranscript, hasIdentifiedTranscript] = await Promise.all([
-          transcriptService.transcriptExists(call.externalId),
-          transcriptService.identifiedTranscriptExists(call.externalId),
-        ]);
+        [hasTranscript, hasIdentifiedTranscript] = transcriptUnlinked
+          ? [false, false]
+          : await Promise.all([
+              transcriptService.transcriptExists(call.externalId),
+              transcriptService.identifiedTranscriptExists(call.externalId),
+            ]);
       } else {
         if (call.transcript) {
           try {
@@ -1413,10 +1419,12 @@ export class CallController {
         }
 
         // Fetch real-time identified transcript (written during call by the Python agent)
-        try {
-          identifiedTranscriptContent = await transcriptService.getIdentifiedTranscriptContent(call.externalId);
-        } catch (fetchError) {
-          logger.warn(`Failed to fetch identified transcript: ${fetchError}`);
+        if (!transcriptUnlinked) {
+          try {
+            identifiedTranscriptContent = await transcriptService.getIdentifiedTranscriptContent(call.externalId);
+          } catch (fetchError) {
+            logger.warn(`Failed to fetch identified transcript: ${fetchError}`);
+          }
         }
         hasTranscript = !!transcriptContent;
         hasIdentifiedTranscript = !!identifiedTranscriptContent;
@@ -2007,7 +2015,8 @@ export class CallController {
         return;
       }
 
-      const transcript = await transcriptService.getTranscriptContent(callId);
+      // An admin-unlinked transcript still sits in storage (translations included); treat it as absent.
+      const transcript = isTranscriptUnlinked(call) ? null : await transcriptService.getTranscriptContent(callId);
       if (transcript === null) {
         res.status(404).json({ success: false, error: 'Transcript not available for this call' });
         return;
@@ -2194,7 +2203,9 @@ export class CallController {
       }
 
       // 3. Get transcript content
-      const transcriptContent = await transcriptService.getTranscriptContent(call.externalId);
+      const transcriptContent = isTranscriptUnlinked(call)
+        ? null
+        : await transcriptService.getTranscriptContent(call.externalId);
       if (!transcriptContent) {
         res.status(404).json({ success: false, error: 'Transcript not available for this call' });
         return;
@@ -2298,7 +2309,9 @@ export class CallController {
       }
 
       // 3. Get transcript content
-      const transcriptContent = await transcriptService.getTranscriptContent(call.externalId);
+      const transcriptContent = isTranscriptUnlinked(call)
+        ? null
+        : await transcriptService.getTranscriptContent(call.externalId);
       if (!transcriptContent) {
         res.status(404).json({ success: false, error: 'Transcript not available for this call' });
         return;
