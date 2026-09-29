@@ -27,6 +27,7 @@ export default defineConfig(({ command, mode }) => {
   // Deployment lane. Unset for the main bundle, which keeps base '/' and 5173.
   const appBasePath = env.VITE_APP_BASE_PATH || '/';
   const isSdlcSurface = env.VITE_XYNE_SURFACE === 'sdlc';
+  const isTestSurface = env.VITE_ENVIRONMENT === 'test' || mode === 'test';
   const devPort = Number(env.VITE_DEV_PORT) || (isSdlcSurface ? 5175 : 5173);
 
   const sharedSrc = path.resolve(__dirname, '../../packages/shared/src');
@@ -61,8 +62,12 @@ export default defineConfig(({ command, mode }) => {
     base: appBasePath,
     // Both lanes run from this same project dir, so they would share
     // node_modules/.vite and invalidate each other's prebundled deps
-    // ("504 Outdated Optimize Dep"). Give the SDLC server its own.
-    ...(isSdlcSurface ? { cacheDir: 'node_modules/.vite-sdlc' } : {}),
+    // ("504 Outdated Optimize Dep"). Give the SDLC and test servers their own.
+    ...(isSdlcSurface
+      ? { cacheDir: 'node_modules/.vite-sdlc' }
+      : isTestSurface
+        ? { cacheDir: 'node_modules/.vite-test' }
+        : {}),
     plugins: [
       react(),
       ...(isDev
