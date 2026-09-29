@@ -516,6 +516,7 @@ export enum UserType {
   USER = 'USER',
   BOT = 'BOT',
   APP = 'APP',
+  AGENT = 'AGENT',
 }
 
 // @ts-ignore TS1294
